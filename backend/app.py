@@ -1,27 +1,86 @@
 import firebase_admin
-from firebase_admin import credentials, firestore, auth
+from firebase_admin import credentials, firestore, auth, storage
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
+from functools import wraps # 데코레이터용 functools 추가
+from google.cloud import vision # Vertex AI Vision (또는 AutoML) 용
 
 # 환경변수 로드: .env 파일에서 설정값 가져오기
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+# load_dotenv()
 key_path = os.getenv("SERVICE_ACCOUNT_KEY_PATH")
+google_application_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") # Vision API용 서비스 계정 키 경로 (key_path와 같을 수 있음)
 
 # Flask 앱 초기화: 사서 창구를 여는 코드 (Flask는 API를 만드는 도구예요)
 app = Flask(__name__)
-CORS(app)  # React와 대화할 수 있게 허용 (CORS는 다른 앱과의 연결을 허용해줘요)
+# 개발 환경에서는 모든 출처 허용, 프로덕션에서는 특정 출처 지정 필요
+CORS(app, origins=os.getenv("CORS_ALLOWED_ORIGINS", "*").split(','))
+# CORS(app)  # React와 대화할 수 있게 허용 (CORS는 다른 앱과의 연결을 허용해줘요)
 
 # Firebase Admin SDK 초기화: 도서관 문을 여는 코드
-cred = credentials.Certificate(key_path)  # 도서관(데이터베이스) 열쇠 파일 경로
-firebase_admin.initialize_app(cred)  # 도서관(데이터베이스) 문 열기
-db = firestore.client()  # 도서관(데이터베이스) 안으로 들어가기
+try:
+    cred = credentials.Certificate(key_path)  # 도서관(데이터베이스) 열쇠 파일 경로
+    firebase_admin.initialize_app(cred, {
+        'storageBucket': os.getenv("FIREBASE_STORAGE_BUCKET_NAME") # .env 파일에 FIREBASE_STORAGE_BUCKET_NAME=your-bucket-name.appspot.com 추가 필요
+    })  # 도서관(데이터베이스) 문 열기
+    db = firestore.client()  # 도서관(데이터베이스) 안으로 들어가기
+    bucket = storage.bucket() # Firebase Storage 버킷 객체
+    print("Firebase Admin SDK 초기화 성공")
+except Exception as e:
+    print(f"Firebase Admin SDK 초기화 실패: {e}")
+    # 앱 실행을 중단하거나 기본값으로 계속 진행할지 결정해야 함
+    db = None # db 사용 전에 None 체크 필요
+    bucket = None
+# cred = credentials.Certificate(key_path)  # 도서관(데이터베이스) 열쇠 파일 경로
+# firebase_admin.initialize_app(cred)  # 도서관(데이터베이스) 문 열기
+# db = firestore.client()  # 도서관(데이터베이스) 안으로 들어가기
+    
+# --- Vertex AI Vision 클라이언트 초기화 ---
+# GOOGLE_APPLICATION_CREDENTIALS 환경변수가 설정되어 있으면 자동으로 인증됨
+try:
+    vision_client = vision.ImageAnnotatorClient()
+    print("Vertex AI Vision 클라이언트 초기화 성공")
+except Exception as e:
+    print(f"Vertex AI Vision 클라이언트 초기화 실패: {e}")
+    vision_client = None
+    
+# --- 인증 토큰 검증 데코레이터 ---
+def token_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = None
+        # Authorization 헤더에서 Bearer 토큰 추출
+        if 'Authorization' in request.headers:
+            try:
+                token = request.headers['Authorization'].split('Bearer ')[1]
+            except IndexError:
+                return jsonify({"error": "잘못된 형식의 토큰입니다."}), 401
 
-# 로컬호스트 루트주소 접속시 보여줄 메시지(API 구동여부 테스트 환경용)
+        if not token:
+            return jsonify({"error": "인증 토큰이 필요합니다."}), 401
+
+        try:
+            # Firebase ID 토큰 검증
+            decoded_token = auth.verify_id_token(token)
+            # 검증된 사용자 UID를 request 객체 등에 저장하여 라우트 함수에서 사용 가능하게 할 수 있음
+            # 예: request.user = decoded_token
+            print(f"토큰 검증 성공: UID={decoded_token['uid']}")
+        except auth.ExpiredIdTokenError:
+            return jsonify({"error": "만료된 토큰입니다."}), 401
+        except auth.InvalidIdTokenError:
+            return jsonify({"error": "유효하지 않은 토큰입니다."}), 401
+        except Exception as e:
+            return jsonify({"error": f"토큰 검증 중 알 수 없는 오류 발생: {str(e)}"}), 500
+
+        return f(*args, **kwargs, current_user_uid=decoded_token['uid']) # uid를 인자로 전달
+    return decorated_function
+
+# 로컬호스트 루트주소 접속시 보여줄 메시지(API Route 구동여부 테스트 환경용)
 @app.route('/')  # 루트 URL 추가
 def home():
-    return "Hello, Flask!"
+    return "Herb Finder API에 오신 것을 환영합니다!"
 
 # 사용자 생성 API: "/create_user"라는 창구를 만드는 코드
 @app.route('/create_user', methods=['POST'])  # POST 요청만 받음 (새로운 데이터를 만들 때 사용)
