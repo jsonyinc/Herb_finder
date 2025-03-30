@@ -85,6 +85,8 @@ def home():
 # 사용자 생성 API: "/create_user"라는 창구를 만드는 코드
 @app.route('/create_user', methods=['POST'])  # POST 요청만 받음 (새로운 데이터를 만들 때 사용)
 def create_user():
+    # (기존 코드 유지 - 단, Firestore 저장 시 에러 처리 강화 고려)
+    if not db: return jsonify({"error": "데이터베이스 연결 실패"}), 500
     try:
         # 요청 데이터 받기: 사용자가 보낸 정보를 받아요
         data = request.json
@@ -102,46 +104,75 @@ def create_user():
         db.collection('users').document(user.uid).set({
             'nickname': data['nickname'],  # 탐험가 이름
             'avatar': data.get('avatar', ''),  # 사진 URL, 없으면 빈 문자열
+            'email': data['email'], # Firestore에도 이메일 저장 (선택적)
             'created_at': firestore.SERVER_TIMESTAMP  # 지금 시간 자동으로
-        })
+        }, merge=True) # merge=True: 문서가 존재하면 병합 (더 안전)
 
         # 성공 응답: "잘 됐어요!"라는 메시지와 사용자 ID를 돌려줘요
         return jsonify({"uid": user.uid, "message": "사용자 생성 성공"}), 201
 
-    except auth.EmailAlreadyExistsError:
-        # 이미 존재하는 이메일: 중복 에러
+    except auth.EmailAlreadyExistsError:  # 이미 존재하는 이메일: 중복 에러       
         return jsonify({"error": "이미 존재하는 이메일입니다."}), 409  # 충돌 에러
-    except auth.InvalidPasswordError:
-        # 비밀번호가 잘못됨: 인증 에러
+    except auth.InvalidPasswordError:  # 비밀번호가 잘못됨: 인증 에러
         return jsonify({"error": "비밀번호는 6자 이상이어야 합니다."}), 401  # 인증 실패 에러
+    except auth.FirebaseAuthError as e:  # 더 구체적인 Firebase Auth 에러 처리
+         return jsonify({"error": f"Firebase 인증 오류: {str(e)}"}), 400
     except Exception as e:
-        # 기타 에러: 서버에서 문제가 생겼을 때
-        return jsonify({"error": f"서버 오류: {str(e)}"}), 500  # 서버 에러
+        print(f"Error in create_user: {e}") # 서버 로그에 에러 기록
+        return jsonify({"error": "사용자 생성 중 서버 오류 발생"}), 500
     
-# 게시물 생성 엔드포인트
-@app.route('/create_post', methods=['POST'])  # POST 요청을 받아 새로운 게시물 생성
-def create_post():
+# 게시물 생성 (인증 필요, 이미지 URL 포함)
+@app.route('/posts', methods=['POST']) # RESTful하게 경로 변경 고려 (/create_post -> /posts)
+@token_required # 인증 토큰 검증 데코레이터 적용
+def create_post(current_user_uid): # 데코레이터에서 전달된 uid 받기
+    if not db: return jsonify({"error": "데이터베이스 연결 실패"}), 500
     try:
         # 요청 데이터 받기: 클라이언트에서 보낸 JSON 데이터를 추출
         data = request.get_json()
 
-        # 데이터 검증: 필수 필드(title, content, author, user_id)가 있는지 확인
-        if not data or 'title' not in data or 'content' not in data or 'author' not in data or 'user_id' not in data:
-            return jsonify({"error": "제목, 내용, 작성자, 사용자 ID는 필수입니다."}), 400
-
-        # 사용자 존재 여부 확인: Firestore에서 user_id로 사용자 문서 조회
-        user_ref = db.collection('users').document(data['user_id']).get()
-        if not user_ref.exists:
-            return jsonify({"error": "존재하지 않는 사용자입니다."}), 404
-
+        # 데이터 검증: 필수 필드(title, user_id, imageUrl)가 있는지 확인
+        required_fields = ['title', 'imageUrl', 'user_id'] # content는 선택 사항으로 가정
+        if not data or not all(field in data for field in required_fields):
+            return jsonify({"error": "제목, 이미지 URL, 사용자 ID는 필수입니다."}), 400
+        
+        # 요청한 user_id가 실제 인증된 사용자의 uid와 일치하는지 확인 (보안 강화)
+        if data['user_id'] != current_user_uid:
+            return jsonify({"error": "자신의 게시물만 생성할 수 있습니다."}), 403 # Forbidden
+        
+        # 사용자 존재 여부 확인 (선택적: 토큰 검증 시 이미 존재 확인됨)
+        # user_ref = db.collection('users').document(data['user_id']).get()
+        # if not user_ref.exists:
+        #     return jsonify({"error": "존재하지 않는 사용자입니다."}), 404
+        
         # 게시물 데이터 준비: Firestore에 저장할 데이터 구성
         post_data = {
-            'title': data['title'],  # 게시물 제목
-            'content': data['content'],  # 게시물 내용
-            'author': data['author'],  # 작성자 이름
-            'user_id': data['user_id'],  # 작성자의 사용자 ID
-            'created_at': firestore.SERVER_TIMESTAMP  # 서버 시간으로 생성 시간 기록
+            'title': data['title'], # 게시물 제목
+            'content': data.get('content', ''), # 게시물 내용이 없으면 빈 문자열
+            'imageUrl': data['imageUrl'], # 이미지 URL 저장
+            'user_id': data['user_id'], # 작성자 ID (토큰에서 검증됨)
+            'plantName': data.get('plantName', ''), # 식물 이름 (클라이언트에서 분석 후 전달받거나, 여기서 분석 후 저장)
+            'location': data.get('location'), # 위치 정보 (GeoPoint 또는 위도/경도)
+            'recipeLink': data.get('recipeLink', ''), # 레시피 링크
+            'youtubeLink': data.get('youtubeLink', ''), # 유튜브 링크
+            'efficacy': data.get('efficacy', ''), # 효능
+            'precautions': data.get('precautions', ''), # 주의사항
+            'likesCount': 0, # 좋아요 수 초기화
+            'commentsCount': 0, # 댓글 수 초기화
+            'created_at': firestore.SERVER_TIMESTAMP,
+            'updated_at': firestore.SERVER_TIMESTAMP,
         }
+        
+        # Firestore에 게시물 저장 (add는 자동 ID 생성)
+        update_time, post_ref = db.collection('posts').add(post_data)
+
+        # 성공 응답
+        return jsonify({"post_id": post_ref.id, "message": "게시물 생성 성공"}), 201
+
+    except Exception as e:
+        print(f"Error in create_post: {e}")
+        return jsonify({"error": f"게시물 생성 중 서버 오류 발생: {str(e)}"}), 500 
+
+ 
 
         # Firestore에 게시물 저장: posts 컬렉션에 새 문서 추가
         post_ref = db.collection('posts').add(post_data)
@@ -153,20 +184,89 @@ def create_post():
         # 기타 에러 처리: 서버에서 발생한 오류를 클라이언트에 전달
         return jsonify({"error": f"서버 오류: {str(e)}"}), 500
 
-# 인증 토큰 검증 API    
-@app.route('/verify_token', methods=['POST'])
-def verify_token():
+# 게시물 목록 조회 (페이지네이션 고려) - 예시
+@app.route('/posts', methods=['GET'])
+def get_posts():
+    if not db: return jsonify({"error": "데이터베이스 연결 실패"}), 500
     try:
-        id_token = request.json.get('idToken')
-        if not id_token:
-            return jsonify({"error": "토큰이 필요합니다."}), 400
+        # 페이지네이션 파라미터 (예: /posts?limit=10&startAfter=DOCUMENT_ID)
+        limit = int(request.args.get('limit', 10))
+        start_after_doc_id = request.args.get('startAfter')
 
-        decoded_token = auth.verify_id_token(id_token)
-        uid = decoded_token['uid']
-        return jsonify({"uid": uid, "message": "인증 성공"}), 200
-    
+        posts_query = db.collection('posts').order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
+
+        if start_after_doc_id:
+            start_after_doc = db.collection('posts').document(start_after_doc_id).get()
+            if start_after_doc.exists:
+                posts_query = posts_query.start_after(start_after_doc)
+
+        posts = []
+        for doc in posts_query.stream():
+            post_data = doc.to_dict()
+            post_data['id'] = doc.id
+            # created_at, updated_at을 문자열로 변환 (JSON 직렬화 가능하도록)
+            if 'created_at' in post_data and hasattr(post_data['created_at'], 'isoformat'):
+                 post_data['created_at'] = post_data['created_at'].isoformat()
+            if 'updated_at' in post_data and hasattr(post_data['updated_at'], 'isoformat'):
+                 post_data['updated_at'] = post_data['updated_at'].isoformat()
+            posts.append(post_data)
+
+        return jsonify(posts), 200
+
     except Exception as e:
-        return jsonify({"error": f"인증 실패: {str(e)}"}), 401
+        print(f"Error in get_posts: {e}")
+        return jsonify({"error": f"게시물 조회 중 서버 오류 발생: {str(e)}"}), 500
+
+# 식물 이미지 분석 (Vertex AI 연동)
+@app.route('/analyze_plant_image', methods=['POST'])
+@token_required # 인증된 사용자만 분석 요청 가능
+def analyze_plant_image(current_user_uid):
+    if not vision_client:
+        return jsonify({"error": "Vertex AI Vision 클라이언트 초기화 실패"}), 500
+
+    try:
+        data = request.get_json()
+        if not data or 'imageUrl' not in data:
+            return jsonify({"error": "이미지 URL(imageUrl)은 필수입니다."}), 400
+
+        image_url = data['imageUrl']
+
+        # TODO: 이미지 URL이 Firebase Storage URL인지, 접근 권한이 있는지 등 검증 로직 추가 고려
+
+        image = vision.Image()
+        # GCS URI 또는 공개 URL 사용 가능
+        # GCS URI 예시: "gs://{bucket_name}/{file_path}"
+        # Firebase Storage URL을 GCS URI로 변환하거나, 공개 URL로 만들어야 할 수 있음
+        # 또는 이미지 데이터를 직접 전송받는 방식도 고려 가능 (request.files)
+        image.source.image_uri = image_url # 공개 접근 가능한 URL이어야 함
+
+        # Vertex AI Vision API 호출 (예: 라벨 감지)
+        # 실제 사용할 기능에 맞게 수정 필요 (예: AutoML 모델 예측, 객체 탐지 등)
+        response = vision_client.label_detection(image=image)
+        labels = response.label_annotations
+
+        # 결과 파싱 (예시: 가장 확률 높은 라벨 이름 반환)
+        plant_name = "식별 불가"
+        if labels:
+            # labels 리스트를 score 기준으로 정렬하여 가장 높은 것 선택 등 로직 추가
+            plant_name = labels[0].description
+
+        # 에러 처리
+        if response.error.message:
+             raise Exception(f"Vertex AI Vision API 오류: {response.error.message}")
+
+        return jsonify({"plantName": plant_name, "analysis_details": [l.description for l in labels]}), 200
+
+    except Exception as e:
+        print(f"Error in analyze_plant_image: {e}")
+        return jsonify({"error": f"이미지 분석 중 서버 오류 발생: {str(e)}"}), 500
+
+
+# (기존 /verify_token 엔드포인트는 데코레이터 테스트용으로 남겨두거나 제거)
+# @app.route('/verify_token', methods=['POST'])
+# @token_required
+# def verify_token_test(current_user_uid):
+#     return jsonify({"uid": current_user_uid, "message": "인증 성공 (테스트)"}), 200
 
 
 # Flask 앱 실행: 도서관 사서 창구를 열고 손님 대기하기
@@ -174,5 +274,6 @@ def verify_token():
     # host='0.0.0.0': 모든 네트워크에서 접근 가능 (로컬 네트워크의 다른 기기에서도 접속 가능)
     # port=5000: 5000번 문으로 열어 (포트 번호를 명확히 지정)
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+    # 프로덕션 환경에서는 Gunicorn 같은 WSGI 서버 사용 권장
+    app.run(debug=os.getenv('FLASK_DEBUG', 'False') == 'True', host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
     

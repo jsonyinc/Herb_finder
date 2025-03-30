@@ -16,11 +16,13 @@ google-auth-httplib2==0.2.0
 google-cloud-core==2.4.3
 google-cloud-firestore==2.20.1
 google-cloud-storage==3.1.0
+google-cloud-vision>=2.7 # 또는 사용하는 Vertex AI 관련 라이브러리
 google-crc32c==1.7.1rc1
 google-resumable-media==2.7.2
 googleapis-common-protos==1.69.2
 grpcio==1.71.0
 grpcio-status==1.71.0
+gunicorn # 프로덕션 배포 시 권장 (Cloud Functions 환경에서는 자동 관리될 수 있음)
 httplib2==0.22.0
 idna==3.10
 itsdangerous==2.2.0
