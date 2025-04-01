@@ -9,7 +9,7 @@ from google.cloud import vision # Vertex AI Vision (또는 AutoML) 용
 
 # 환경변수 로드: .env 파일에서 설정값 가져오기
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
-# load_dotenv()
+
 key_path = os.getenv("SERVICE_ACCOUNT_KEY_PATH")
 google_application_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") # Vision API용 서비스 계정 키 경로 (key_path와 같을 수 있음)
 
