@@ -88,21 +88,21 @@ def token_required(f):
             return jsonify({"error": f"토큰 검증 중 오류 발생: {str(e)}"}), 500
     return decorated_function
 
-# 한국 식물 DB API 호출 함수
-def fetch_korean_plant_info(plant_name):
-    try:
-        api_url = "https://korean-plant-db.example.com/api/plants"  # 가상의 API URL
-        params = {"query": plant_name, "lang": "kr"}
-        response = requests.get(api_url, params=params, timeout=5)
-        response.raise_for_status()
-        data = response.json()
-        return {
-            "description_kr": data.get("description", ""),
-            "image_url_kr": data.get("image_url", "")
-        }
-    except requests.RequestException as e:
-        logger.error(f"한국 식물 DB API 오류: {e}")
-        return {"description_kr": "", "image_url_kr": ""}
+# 한국 식물 DB API 호출 함수 => 향후 연결 예정
+# def fetch_korean_plant_info(plant_name):
+#     try:
+#         api_url = "https://korean-plant-db.example.com/api/plants"  # 가상의 API URL
+#         params = {"query": plant_name, "lang": "kr"}
+#         response = requests.get(api_url, params=params, timeout=5)
+#         response.raise_for_status()
+#         data = response.json()
+#         return {
+#             "description_kr": data.get("description", ""),
+#             "image_url_kr": data.get("image_url", "")
+#         }
+#     except requests.RequestException as e:
+#         logger.error(f"한국 식물 DB API 오류: {e}")
+#         return {"description_kr": "", "image_url_kr": ""}
 
 # 식물 정보 조회/저장 함수
 def get_plant_info(plant_name):
@@ -113,6 +113,9 @@ def get_plant_info(plant_name):
         data = plant_data.to_dict()
         if 'updated_at' in data and hasattr(data['updated_at'], 'isoformat'):
             data['updated_at'] = data['updated_at'].isoformat()
+        # plantName 보장
+        if 'plantName' not in data:
+            data['plantName'] = plant_name
         return data
     return None
 
@@ -120,14 +123,15 @@ def save_plant_info(plant_name, scientific_name, common_names, family):
     common_names_kr = [translate_client.translate(name, target_language='ko')['translatedText'] for name in common_names if name.strip()]
     family_kr = translate_client.translate(family, target_language='ko')['translatedText']
     
-    korean_info = fetch_korean_plant_info(plant_name)
+    # korean_info = fetch_korean_plant_info(plant_name) # 한국 식물 DB 향후 연결 예정
     
     plant_data = {
+        'plantName': plant_name, 
         'scientificName': scientific_name,
         'commonNames_kr': common_names_kr,
         'family_kr': family_kr,
-        'description_kr': korean_info['description_kr'],
-        'image_url_kr': korean_info['image_url_kr'],
+        # 'description_kr': korean_info['description_kr'], # 한국 식물 DB 향후 연결 예정
+        # 'image_url_kr': korean_info['image_url_kr'], # 한국 식물 DB 향후 연결 예정
         'updated_at': datetime.utcnow().isoformat()  # Sentinel 대신 현재 시간 사용
     }
     db.collection('plant_info').document(plant_name).set({
@@ -261,6 +265,7 @@ def analyze_plant_image():
             plant_name = cached['plantName']
             plant_info = get_plant_info(plant_name)
             if plant_info:
+                plant_info['plantName'] = plant_name
                 return jsonify(plant_info), 200
 
         blob_path = unquote(image_url.split(f"/o/")[1].split("?")[0])
@@ -286,6 +291,9 @@ def analyze_plant_image():
         plant_info = get_plant_info(plant_name)
         if not plant_info:
             plant_info = save_plant_info(plant_name, plant_name, common_names, family)
+            
+        # plantName 명시적으로 추가
+        plant_info['plantName'] = plant_name
 
         cache_key = hashlib.sha256(image_url.encode()).hexdigest()
         db.collection('analysis_cache').document(cache_key).set({

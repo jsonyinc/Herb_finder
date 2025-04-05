@@ -25,6 +25,13 @@ import {
   DialogContent,
   DialogActions,
   TextField as MuiTextField,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from '@mui/material';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
@@ -303,12 +310,11 @@ function LandingPage({ currentUser, onLoginRequested }) {
       <Typography variant="h4" gutterBottom>
         식물 이미지 분석
       </Typography>
-      <Box sx={{ mb: 2 }}>
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
         <Button
           variant="contained"
           color="primary"
           startIcon={<CameraAltIcon />}
-          sx={{ mr: 2 }}
           onClick={handleCameraClick}
         >
           사진 촬영
@@ -318,38 +324,71 @@ function LandingPage({ currentUser, onLoginRequested }) {
           <input type="file" hidden onChange={handleFileChange} accept="image/*" />
         </Button>
       </Box>
-      {imageUrl && <img src={imageUrl} alt="미리보기" style={{ maxWidth: '100%', marginBottom: '16px' }} />}
-      {loading ? (
-        <CircularProgress />
-      ) : (
-        <Button variant="contained" color="secondary" onClick={handleAnalyze}>
-          분석하기
-        </Button>
-      )}
+      {imageUrl && <img src={imageUrl} alt="미리보기" style={{ maxWidth: '100%', marginBottom: '16px', borderRadius: '8px' }} />}
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+        {loading ? (
+          <CircularProgress />
+        ) : (
+          <Button variant="contained" color="secondary" onClick={handleAnalyze}>
+            분석하기
+          </Button>
+        )}
+      </Box>
       {analysisResult && (
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="h6">분석 결과</Typography>
-          <Typography>식물 이름: {analysisResult.plantName}</Typography>
-          <Typography>일반 이름: {analysisResult.commonNames_kr?.join(', ') || '없음'}</Typography>
-          <Typography>과: {analysisResult.family_kr || '없음'}</Typography>
-          <Typography>설명: {analysisResult.description_kr || '추가 정보 없음'}</Typography>
+        <Box sx={{ mt: 4, p: 2, backgroundColor: '#f8f9fa', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }}>
+          <Typography variant="h6" gutterBottom>
+            분석 결과
+          </Typography>
+          <TableContainer component={Paper} sx={{ boxShadow: 'none', border: '1px solid #e0e0e0', borderRadius: '8px' }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e9ecef', borderBottom: '1px solid #e0e0e0' }}>
+                    항목
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#e9ecef', borderBottom: '1px solid #e0e0e0' }}>
+                    내용
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow>
+                  <TableCell sx={{ borderBottom: '1px solid #e0e0e0' }}>식물 이름</TableCell>
+                  <TableCell sx={{ borderBottom: '1px solid #e0e0e0' }}>{analysisResult.plantName || '정보 없음'}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell sx={{ borderBottom: '1px solid #e0e0e0' }}>일반 이름</TableCell>
+                  <TableCell sx={{ borderBottom: '1px solid #e0e0e0' }}>{analysisResult.commonNames_kr?.join(', ') || '없음'}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell sx={{ borderBottom: '1px solid #e0e0e0' }}>과</TableCell>
+                  <TableCell sx={{ borderBottom: '1px solid #e0e0e0' }}>{analysisResult.family_kr || '없음'}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell sx={{ borderBottom: 'none' }}>설명</TableCell>
+                  <TableCell sx={{ borderBottom: 'none' }}>{analysisResult.description_kr || '추가 정보 없음'}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
           {analysisResult.image_url_kr && (
-            <img
-              src={analysisResult.image_url_kr}
-              alt="식물 이미지"
-              style={{ maxWidth: '100%', marginTop: '10px' }}
-            />
+            <Box sx={{ mt: 2 }}>
+              <img
+                src={analysisResult.image_url_kr}
+                alt="식물 이미지"
+                style={{ maxWidth: '100%', borderRadius: '8px' }}
+              />
+            </Box>
           )}
         </Box>
       )}
-      <Box sx={{ mt: 2 }}>
+      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
         <Button
           variant="outlined"
           endIcon={<ArrowForwardIcon />}
           component={Link}
           to="/results"
           onClick={(e) => !currentUser && onLoginRequested()}
-          sx={{ mr: 2 }}
         >
           전체 검색 기록 보기
         </Button>
