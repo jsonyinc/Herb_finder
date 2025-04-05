@@ -1,42 +1,37 @@
-/* 기본 레이아웃 */
+/* src/App.css */
 .App {
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
-  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
-
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
-
 h1, h2 {
   color: #333;
-  font-size: 2rem; /* 기본 크기 설정 */
 }
-
 .user-list, .post-list {
   list-style: none;
   padding: 0;
 }
-
 .user-list li, .post-list li {
   background: #f9f9f9;
-  padding: 15px; /* 조금 더 여유롭게 */
-  margin: 10px 0; /* 간격 증가 */
+  padding: 15px;
+  margin: 10px 0;
   border-radius: 5px;
   border: 1px solid #ddd;
 }
-
 .post-image {
-  max-width: 100%; /* 이미지 반응형 */
+  max-width: 100%;
   height: auto;
   border-radius: 5px;
 }
-
 .auth-container {
   max-width: 400px;
   margin: 50px auto;
@@ -46,63 +41,11 @@ h1, h2 {
   background: #fff;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
-
-.auth-input {
-  display: block;
-  width: 100%;
-  padding: 10px;
-  margin: 10px 0;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 1rem;
-}
-
-.auth-button, .toggle-button, .logout-button, .load-more-button {
-  padding: 10px 20px;
-  margin: 5px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.3s; /* 부드러운 전환 */
-}
-
-.auth-button {
-  background: #4CAF50;
-  color: white;
-}
-
-.toggle-button {
-  background: #2196F3;
-  color: white;
-}
-
-.logout-button {
-  background: #f44336;
-  color: white;
-}
-
-.load-more-button {
-  background: #007BFF;
-  color: white;
-}
-
-.auth-button:hover, .toggle-button:hover, .logout-button:hover, .load-more-button:hover {
-  opacity: 0.9; /* 호버 효과 추가 */
-}
-
-.error-message {
-  color: #d32f2f; /* 더 강한 빨간색으로 대비 개선 */
-  margin: 10px 0;
-  font-weight: bold;
-}
-
 /* 스켈레톤 UI 스타일 */
 .skeleton-list {
   list-style: none;
   padding: 0;
 }
-
 .skeleton {
   background: #f0f0f0;
   border-radius: 8px;
@@ -111,7 +54,6 @@ h1, h2 {
   overflow: hidden;
   position: relative;
 }
-
 .skeleton-title {
   width: 60%;
   height: 20px;
@@ -119,7 +61,6 @@ h1, h2 {
   border-radius: 4px;
   margin-bottom: 15px;
 }
-
 .skeleton-image {
   width: 100%;
   height: 150px;
@@ -127,7 +68,6 @@ h1, h2 {
   border-radius: 4px;
   margin-bottom: 15px;
 }
-
 .skeleton-content {
   width: 80%;
   height: 15px;
@@ -135,14 +75,12 @@ h1, h2 {
   border-radius: 4px;
   margin-bottom: 10px;
 }
-
 .skeleton-meta {
   width: 40%;
   height: 15px;
   background: #e0e0e0;
   border-radius: 4px;
 }
-
 @keyframes skeleton-loading {
   0% {
     background-position: -200% 0;
@@ -151,7 +89,6 @@ h1, h2 {
     background-position: 200% 0;
   }
 }
-
 .skeleton::before {
   content: '';
   position: absolute;
@@ -162,107 +99,42 @@ h1, h2 {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
   animation: skeleton-loading 1.5s infinite;
 }
-
 /* 반응형 디자인 */
 @media (max-width: 600px) {
   .App {
     padding: 10px;
   }
-
   .header {
-    flex-direction: column; /* 세로로 쌓이게 */
+    flex-direction: column;
     align-items: flex-start;
-    gap: 10px; /* 요소 간 간격 */
+    gap: 10px;
   }
-
   h1, h2 {
-    font-size: 1.5rem; /* 모바일에서 작게 */
+    font-size: 1.5rem;
   }
-
   .user-list li, .post-list li {
-    padding: 10px; /* 모바일에서 여백 축소 */
+    padding: 10px;
   }
-
   .post-image {
-    max-height: 120px; /* 모바일에서 이미지 크기 조정 */
+    max-height: 120px;
   }
-
   .auth-container {
-    max-width: 100%; /* 모바일에서 꽉 채우기 */
+    max-width: 100%;
     margin: 20px 10px;
   }
-
-  .auth-input {
-    font-size: 0.9rem;
-  }
-
-  .auth-button, .toggle-button, .logout-button, .load-more-button {
-    padding: 8px 15px; /* 버튼 크기 축소 */
-    font-size: 0.9rem;
-  }
-
   .skeleton-image {
-    height: 100px; /* 모바일에서 작게 */
+    height: 100px;
   }
-
   .skeleton-title {
     width: 80%;
     height: 18px;
   }
-
   .skeleton-content {
     width: 90%;
     height: 12px;
   }
-
   .skeleton-meta {
     width: 50%;
     height: 12px;
   }
 }
-
-/* 사용되지 않는 스타일 (주석 처리) */
-/*
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
-*/

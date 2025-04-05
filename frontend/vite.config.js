@@ -1,11 +1,37 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()], // React 플러그인 사용: React 앱을 실행하기 위한 설정
+  plugins: [react({
+    jsxImportSource: '@emotion/react',
+    babel: {
+      plugins: ['@emotion/babel-plugin']
+    }
+  })],
   server: {
-    host: '0.0.0.0', // 모든 네트워크에서 접근 가능: 같은 Wi-Fi에 있는 기기에서도 접속 가능
-    port: 5173 // 포트 번호 고정: 5173번 문으로 열기
-  }
-})
+    host: '0.0.0.0', // 모든 네트워크에서 접근 가능
+    port: 5173 // 포트 번호 고정
+  },
+  resolve: {
+    alias: {
+      '@': '/src',
+      // require.resolve 대신 직접 경로 지정
+      '@emotion/react': path.resolve('./node_modules/@emotion/react'),
+      '@emotion/styled': path.resolve('./node_modules/@emotion/styled')
+    },
+  },
+  optimizeDeps: {
+    include: [
+      'firebase/app', 
+      'firebase/auth', 
+      'firebase/firestore', 
+      'firebase/storage',
+      '@emotion/react', 
+      '@emotion/styled'
+    ],
+  },
+  build: {
+    sourcemap: true,
+  },
+});

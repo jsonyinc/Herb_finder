@@ -22,6 +22,7 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
 
+
 export const db = getFirestore(app);
 export const auth = getAuth(app); // 인증 객체 내보내기
 export const storage = getStorage(app); // Storage 객체 내보내기
